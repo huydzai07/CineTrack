@@ -53,6 +53,18 @@ public:
         std::cout << "[O]: Available    | [X]: Booked\n";
     }
 
+    int getAvailableSeats() const {
+        int count = 0;
+        for (size_t i = 0; i < seats.size(); ++i) {
+            for (size_t j = 0; j < seats[i].size(); ++j) {
+                if (seats[i][j] == 'O') {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
     // [ALGORITHM] Validates constraints and reserves a requested seat dynamically
     bool bookSeat(char row, int col) {
         int rIndex = -1;
