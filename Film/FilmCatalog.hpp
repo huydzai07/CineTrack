@@ -1,4 +1,5 @@
 #pragma once
+#include <unordered_map>
 #include <vector>
 #include <memory>
 #include <fstream>
@@ -18,8 +19,8 @@ public:
         std::ofstream file(filmFile);
         for (const auto& film : catalog) {
             file << film->getId() << "," << film->getTitle() << "," 
-                 << film->getGenre() << "," << film->getYear() << "," 
-                 << film->getAvgRating() << "\n"; // Persist the average rating
+                << film->getGenre() << "," << film->getYear() << "," 
+                << film->getAvgRating() << "," << film->getReviewCount() << "\n"; // Đã thêm getReviewCount()
         }
         file.close();
     }
@@ -28,22 +29,22 @@ public:
         std::ifstream file(filmFile);
         if (!file.is_open()) return;
 
-        std::string line, id, title, genre, yearStr, ratingStr;
+        std::string line, id, title, genre, yearStr, ratingStr, countStr; // Thêm countStr
         while (std::getline(file, line)) {
             std::stringstream ss(line);
             std::getline(ss, id, ',');
             std::getline(ss, title, ',');
             std::getline(ss, genre, ',');
             std::getline(ss, yearStr, ',');
-            std::getline(ss, ratingStr, ','); // Read the average rating field
+            std::getline(ss, ratingStr, ','); 
+            std::getline(ss, countStr, ','); // Đọc reviewCount
 
             if (!id.empty()) {
                 int year = std::stoi(yearStr);
                 auto newFilm = std::make_unique<Film>(id, title, genre, year);
-                if (!ratingStr.empty()) {
-                    // [ALGORITHM] Type casting string to double for rating aggregation
-                    newFilm->setRating(std::stod(ratingStr)); 
-                }
+                if (!ratingStr.empty()) newFilm->setRating(std::stod(ratingStr)); 
+                if (!countStr.empty()) newFilm->setReviewCount(std::stoi(countStr)); // Gán lại số lượt đánh giá cũ
+                
                 catalog.push_back(std::move(newFilm));
             }
         }
@@ -123,16 +124,29 @@ public:
     // [UI/UX] Display a compact filter menu before requiring a Film ID input
     void displayWithFilter() const {
         std::string choice;
-        std::cout << "\n[1] View all films | [2] Quick search by keyword | [0] Skip\n";
-        std::cout << "Select display mode: ";
-        std::cin >> choice;
+        
+        // [INPUT VALIDATION] Locks the display mode selection to strictly 0, 1, or 2
+        while (true) {
+            std::cout << "\n[1] View all films | [2] Quick search by keyword | [0] Skip\n";
+            std::cout << "Select display mode: ";
+            std::cin >> choice;
+
+            if (choice == "0" || choice == "1" || choice == "2") {
+                std::cin.ignore(10000, '\n'); // Flushes buffer
+                break;
+            } else {
+                std::cin.clear();
+                std::cin.ignore(10000, '\n');
+                std::cout << "=> Error: Invalid option! Please enter exactly 0, 1, or 2.\n";
+            }
+        }
 
         if (choice == "1") {
             displayAllFilms(); // Print all films along with their showtimes
         } else if (choice == "2") {
             std::string keyword;
             std::cout << "Enter keyword (Title or Genre): ";
-            std::cin.ignore();
+            // std::cin.ignore() removed here to prevent "double enter" bug because it was already flushed in the loop
             std::getline(std::cin, keyword);
             
             std::cout << "\n--- FILTER RESULTS ---\n";
@@ -151,13 +165,26 @@ public:
 
     // [ALGORITHM] Advanced search engine featuring multi-criteria linear filtering and lambda-based sorting
     void advancedSearch() const {
-        std::cout << "\n-- ADVANCED SEARCH FILM --\n";
-        std::cout << "1. View all films\n";
-        std::cout << "2. Search films (by Title or Genre)\n";
-        std::cout << "0. Cancel\n";
-        std::cout << "Select option: ";
         std::string opt;
-        std::cin >> opt;
+
+        // [INPUT VALIDATION] Locks the advanced search menu flow
+        while (true) {
+            std::cout << "\n-- ADVANCED SEARCH FILM --\n";
+            std::cout << "1. View all films\n";
+            std::cout << "2. Search films (by Title or Genre)\n";
+            std::cout << "0. Cancel\n";
+            std::cout << "Select option: ";
+            std::cin >> opt;
+
+            if (opt == "0" || opt == "1" || opt == "2") {
+                std::cin.ignore(10000, '\n'); // Flushes buffer
+                break;
+            } else {
+                std::cin.clear();
+                std::cin.ignore(10000, '\n');
+                std::cout << "=> Error: Invalid option! Please enter exactly 0, 1, or 2.\n";
+            }
+        }
 
         if (opt == "0") {
             std::cout << "=> Operation canceled.\n";
@@ -173,7 +200,6 @@ public:
         } else if (opt == "2") { // Apply linear filter
             std::string keyword;
             std::cout << "Enter search keyword: ";
-            std::cin.ignore();
             std::getline(std::cin, keyword);
             
             for (const auto& film : catalog) {
@@ -182,9 +208,6 @@ public:
                     results.push_back(film.get());
                 }
             }
-        } else {
-            std::cout << "=> Invalid option.\n";
-            return;
         }
 
         if (results.empty()) {
@@ -194,13 +217,26 @@ public:
 
         // --- SORTING ENGINE ---
         std::string sortChoice;
-        std::cout << "\nChoose sorting criteria:\n";
-        std::cout << "1. By Rating (Descending)\n";
-        std::cout << "2. By Release Year (Newest)\n";
-        std::cout << "3. By Title (A-Z)\n";
-        std::cout << "0. Skip sorting (Default view)\n";
-        std::cout << "Your choice: ";
-        std::cin >> sortChoice;
+        
+        // [INPUT VALIDATION] Locks the sorting selection flow
+        while (true) {
+            std::cout << "\nChoose sorting criteria:\n";
+            std::cout << "1. By Rating (Descending)\n";
+            std::cout << "2. By Release Year (Newest)\n";
+            std::cout << "3. By Title (A-Z)\n";
+            std::cout << "0. Skip sorting (Default view)\n";
+            std::cout << "Your choice: ";
+            std::cin >> sortChoice;
+
+            if (sortChoice == "0" || sortChoice == "1" || sortChoice == "2" || sortChoice == "3") {
+                std::cin.ignore(10000, '\n');
+                break;
+            } else {
+                std::cin.clear();
+                std::cin.ignore(10000, '\n');
+                std::cout << "=> Error: Invalid option! Please enter exactly 0, 1, 2, or 3.\n";
+            }
+        }
 
         if (sortChoice == "1") {
             std::sort(results.begin(), results.end(), [](Film* a, Film* b) { return a->getAvgRating() > b->getAvgRating(); });
@@ -210,35 +246,34 @@ public:
             std::sort(results.begin(), results.end(), [](Film* a, Film* b) { return a->getTitle() < b->getTitle(); });
         }
 
-        // 3. Print processed results (WITH SHOWTIMES)
+        // Print processed results (WITH SHOWTIMES)
         std::cout << "\n--- SEARCH RESULTS ---\n";
+        std::unordered_map<std::string, std::vector<std::string>> showtimesMap;
+        std::ifstream stFile("data/showtimes.csv");
+        std::string stLine, sFid, sTime;
+        if (stFile.is_open()) {
+            while(std::getline(stFile, stLine)) {
+                if(stLine.empty()) continue;
+                std::stringstream ss(stLine);
+                std::getline(ss, sFid, ',');
+                std::getline(ss, sTime, ',');
+                if (!sTime.empty()) showtimesMap[sFid].push_back(sTime);
+            }
+            stFile.close();
+        }
+
+        // BƯỚC 2: Duyệt qua kết quả và tra cứu từ RAM (Nhanh gấp 100 lần)
         for (const auto& f : results) {
             std::cout << "[" << f->getId() << "] " << f->getTitle() 
-                      << " (" << f->getYear() << ") - " << f->getGenre() 
-                      << " | Rating: " << f->getAvgRating() << "*\n";
-            
-            // [FILE I/O] Read showtimes.csv directly to map and append showtimes to search results
-            std::ifstream stFile("data/showtimes.csv");
-            std::string stLine, sFid, sTime;
-            bool hasShowtime = false;
+                    << " (" << f->getYear() << ") - " << f->getGenre() 
+                    << " | Rating: " << f->getAvgRating() << "*\n";
             
             std::cout << "       => Showtimes: ";
-            if (stFile.is_open()) {
-                while(std::getline(stFile, stLine)) {
-                    if(stLine.empty()) continue;
-                    std::stringstream ss(stLine);
-                    std::getline(ss, sFid, ',');
-                    std::getline(ss, sTime, ',');
-                    
-                    if (sFid == f->getId() && !sTime.empty()) {
-                        std::cout << "[" << sTime << "] ";
-                        hasShowtime = true;
-                    }
+            if (showtimesMap.find(f->getId()) != showtimesMap.end()) {
+                for (const auto& t : showtimesMap[f->getId()]) {
+                    std::cout << "[" << t << "] ";
                 }
-                stFile.close();
-            }
-            
-            if (!hasShowtime) {
+            } else {
                 std::cout << "No showtimes available";
             }
             std::cout << "\n";
