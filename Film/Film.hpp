@@ -27,10 +27,12 @@ public:
     std::string getId() const { return id; }
     std::string getTitle() const { return title; }
     std::string getGenre() const { return genre; }
+    int getReviewCount() const { return reviewCount; }
     int getYear() const { return year; }
     double getAvgRating() const { return avgRating; }
-    
+
     // [OOP] Setter methods allowing authorized modification of film details
+    void setReviewCount(int count) { reviewCount = count; }
     void setRating(double newRating) { avgRating = newRating; }
     void setTitle(const std::string& newTitle) { title = newTitle; }
     void setGenre(const std::string& newGenre) { genre = newGenre; }
