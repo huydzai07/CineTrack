@@ -58,38 +58,50 @@ public:
         std::cout << "Enter password: ";
         std::cin >> inputPass;
 
+        
+        std::cin.ignore(10000, '\n');
+
         for (const auto& user : users) {
-            // [OOP] Encapsulation: Utilizing public getter methods to verify private credentials
             if (user->getUsername() == inputName && user->checkPassword(inputPass)) {
                 std::cout << "=> Login successful with " << user->getRole() << " privileges!\n";
+                system("pause"); // Dừng 1 nhịp trước khi vào Menu chính
                 return user; 
             }
         }
         std::cout << "=> Error: Incorrect username or password!\n";
+        system("pause"); // FIX CHỚP TẮT: Dừng màn hình để đọc lỗi đăng nhập
         return nullptr;
     }
 
     // [FILE I/O & DATA STRUCTURES] Register a new customer and persist their data
     void registerUser() {
         std::string inputName, inputPass;
-        int inputAge; 
+        int inputAge = 0; 
         
         std::cout << "\n--- REGISTER NEW CUSTOMER ---\n";
+
         bool validName = false;
         while (!validName) {
-            std::cout << "Enter new username (or '0' to cancel): ";
+            std::cout << "Enter new username (no spaces/commas, or '0' to cancel): ";
             std::cin >> inputName;
-            
+            std::cin.ignore(10000, '\n'); 
+
             if (inputName == "0") {
                 std::cout << "=> Registration canceled.\n";
+                system("pause");
                 return;
+            }
+
+            // [CRITICAL FIX] Chặn người dùng nhập dấu phẩy phá hỏng file CSV
+            if (inputName.find(',') != std::string::npos) {
+                std::cout << "=> Error: Username cannot contain commas (,). Please try again.\n\n";
+                continue;
             }
 
             bool exists = false;
             for (const auto& user : users) {
                 if (user->getUsername() == inputName) {
-                    exists = true;
-                    break;
+                    exists = true; break;
                 }
             }
 
@@ -100,27 +112,33 @@ public:
             }
         }
 
-        std::cout << "Enter new password: ";
-        std::cin >> inputPass;
 
-        // [ERROR HANDLING] again if wrong type age
-        inputAge = 0;
+        while (true) {
+            std::cout << "Enter new password (no spaces/commas): ";
+            std::cin >> inputPass;
+            std::cin.ignore(10000, '\n');
+
+            if (inputPass.find(',') != std::string::npos) {
+                std::cout << "=> Error: Password cannot contain commas (,). Please try again.\n";
+            } else {
+                break;
+            }
+        }
+
         while (true) {
             std::cout << "Enter your age: ";
             std::cin >> inputAge;
 
             if (std::cin.fail() || inputAge <= 0) {
-                std::cin.clear();
-                std::cin.ignore(10000, '\n');
+                std::cin.clear(); std::cin.ignore(10000, '\n');
                 std::cout << "=> Error: Invalid age! Please enter a valid positive number.\n";
             } else {
+                std::cin.ignore(10000, '\n'); 
                 break; 
             }
         }
 
         std::string newId = "C" + std::to_string(users.size() + 1);
-
-        // begin with 0 point
         users.push_back(std::make_shared<Customer>(newId, inputName, inputPass, inputAge, 0));
 
         std::ofstream file(userFile, std::ios::app);
@@ -131,9 +149,9 @@ public:
             system("pause"); 
         } else {
             std::cout << "=> Error: Cannot write to " << userFile << "\n";
+            system("pause");
         }
     }
-
     // [FILE I/O & UPGRADE] Dynamically update loyalty points directly in the persistent CSV file
     void updatePointsInFile(const std::string& targetId, int newPoints) {
         std::ifstream fileIn(userFile);
