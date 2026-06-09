@@ -10,7 +10,14 @@
 #include <vector>
 #include <cstdlib>
 #include <ctime>
-#include <cstdlib>
+
+// Turn commas into space to avoid breaking the csv structrue
+void sanitizeCSV(std::string& input) {
+    for (char& c : input) {
+        if (c == ',') c = ' ';
+    }
+}
+
 
 void displayMainMenu() {
     std::cout << "\n=== CINETRACK SYSTEM ===\n";
@@ -21,7 +28,9 @@ void displayMainMenu() {
 }
 
 int main() {
+    // Initializes the random number generator for booking codes
     srand(time(0));
+    
     // [FILE I/O] Initialize system managers and preload data from CSV files into RAM
     AuthManager auth;
     auth.loadUsersFromFile();
@@ -30,44 +39,52 @@ int main() {
     catalog.loadFilmsFromFile(); 
 
     int choice = -1;
+    // Main execution loop: Displays menu and handles primary navigation
     while (choice != 0) {
-        system("cls"); // Clears the console for a minimalist UI experience
-        displayMainMenu();
-        std::cin >> choice;
-        
-        // [ERROR HANDLING] Buffer clearing mechanism. 
-        // Prevents infinite loops and system crashes if the user inputs a char/string instead of an int.
-        if (std::cin.fail()) {
-            std::cin.clear(); // Clear the error flag
-            std::cin.ignore(10000, '\n'); // Discard invalid characters in the input buffer
-            std::cout << "=> Error: Please enter an integer only!\n";
-            choice = -1; // Reset variable to safely continue the loop
-            continue; 
+        // [INPUT VALIDATION] Locks the Main Menu flow, strictly requiring 0, 1, or 2
+        while (true) {
+            system("cls"); // Clears the console for a minimalist UI experience
+            displayMainMenu();
+            std::cin >> choice;
+
+            // Prevents infinite loops and system crashes if the user inputs a char/string instead of an int
+            if (std::cin.fail() || choice < 0 || choice > 2) {
+                std::cin.clear(); // Clear the error flag
+                std::cin.ignore(10000, '\n'); // Discard invalid characters in the input buffer
+                std::cout << "=> Error: Invalid option! Please enter exactly 0, 1, or 2.\n";
+                system("pause"); 
+            } else {
+                std::cin.ignore(10000, '\n'); // Clears any remaining whitespace in the buffer
+                break; 
+            }
         }
 
         switch (choice) {
             case 1: { 
-                std::cout << "\n--- LOGIN ---\n";
-                // [OOP & MEMORY] Polymorphism applied here. 
-                // Using std::shared_ptr (Smart Pointer) to securely manage dynamic memory 
-                // of the abstract User class, preventing memory leaks automatically.
+                system("cls");
+                // [OOP & MEMORY] Polymorphism applied here using std::shared_ptr for safe memory management
                 std::shared_ptr<User> loggedInUser = auth.login(); 
                 
                 if (loggedInUser != nullptr) {
                     int subChoice = -1;
                     while (subChoice != 0) {
-                        // [OOP] Dynamic binding: calls the overridden displayMenu() of either Admin or Customer
-                        loggedInUser->displayMenu();
-                        std::cout << "Select option: ";
-                        std::cin >> subChoice;
+                        
+                        // [INPUT VALIDATION] Locks the Sub-Menu flow for Admin/Customer to valid ranges (0-6)
+                        while (true) {
+                            loggedInUser->displayMenu(); // Dynamic binding: calls Admin or Customer menu
+                            std::cout << "Select option: ";
+                            std::cin >> subChoice;
 
-                        // [ERROR HANDLING] Input validation for sub-menus
-                        if (std::cin.fail()) {
-                            std::cin.clear(); 
-                            std::cin.ignore(10000, '\n'); 
-                            std::cout << "=> Error: Please enter an integer only!\n";
-                            subChoice = -1; 
-                            continue; 
+                            if (std::cin.fail() || subChoice < 0 || subChoice > 6) {
+                                std::cin.clear(); 
+                                std::cin.ignore(10000, '\n'); 
+                                std::cout << "=> Error: Invalid option! Please enter a number between 0 and 6.\n";
+                                system("pause");
+                                system("cls"); 
+                            } else {
+                                std::cin.ignore(10000, '\n'); 
+                                break;
+                            }
                         }
 
                         if (subChoice == 0) {
@@ -86,14 +103,33 @@ int main() {
                                 std::cout << "Enter Film ID (e.g., f001) or '0' to cancel: ";
                                 std::cin >> id;
                                 if (id == "0") { std::cout << "=> Operation canceled.\n"; continue; }
+
+                                if (catalog.getFilmTitleById(id) != "Unknown Film") {
+                                    std::cout << "=> Error: This Film ID already exists in the system!\n";
+                                    system("pause");
+                                    continue;
+                                }
                                 
                                 std::cin.ignore(); 
                                 std::cout << "Enter Title: ";
                                 std::getline(std::cin, title);
+                                sanitizeCSV(title);
                                 std::cout << "Enter Genre: ";
                                 std::getline(std::cin, genre);
-                                std::cout << "Enter Year: ";
-                                std::cin >> year;
+                                sanitizeCSV(genre);
+                                
+                                // [INPUT VALIDATION] Re-prompts until a valid numerical year is entered
+                                while (true) {
+                                    std::cout << "Enter Year: ";
+                                    std::cin >> year;
+                                    if (std::cin.fail() || year < 1800 || year > 2100) {
+                                        std::cin.clear(); std::cin.ignore(10000, '\n');
+                                        std::cout << "=> Error: Invalid year! Please enter a valid number (1800-2100).\n";
+                                    } else {
+                                        std::cin.ignore(10000, '\n');
+                                        break;
+                                    }
+                                }
                                 
                                 catalog.addFilm(id, title, genre, year);
                                 catalog.displayAllFilms();
@@ -112,7 +148,7 @@ int main() {
                                 showtimeMgr.displayShowtimesForFilm(targetId);
                                 
                                 std::string timeStr;
-                                // Loop to allow adding multiple showtimes continuously without returning to main menu
+                                // Loop allows adding multiple showtimes continuously without returning to main menu
                                 while (true) {
                                     std::cout << "\nEnter showtime to add (e.g., 18:30) or '0' to finish: ";
                                     std::cin >> timeStr;
@@ -121,7 +157,6 @@ int main() {
                                         std::cout << "=> Showtime update completed!\n";
                                         break; 
                                     }
-                                    
                                     showtimeMgr.addShowtime(targetId, timeStr);
                                 }
                             }
@@ -133,8 +168,18 @@ int main() {
                                 std::cin >> targetId;
                                 if (targetId == "0") { std::cout << "=> Operation canceled.\n"; continue; }
                                 
-                                std::cout << "Enter new rating (0.0 - 5.0): ";
-                                std::cin >> newRate;
+                                // [INPUT VALIDATION] Strict boundary check for movie ratings
+                                while (true) {
+                                    std::cout << "Enter new rating (0.0 - 5.0): ";
+                                    std::cin >> newRate;
+                                    if (std::cin.fail() || newRate < 0.0 || newRate > 5.0) {
+                                        std::cin.clear(); std::cin.ignore(10000, '\n');
+                                        std::cout << "=> Error: Invalid rating! Please enter a number between 0.0 and 5.0.\n";
+                                    } else {
+                                        std::cin.ignore(10000, '\n');
+                                        break;
+                                    }
+                                }
                                 
                                 catalog.updateRating(targetId, newRate);
                             }
@@ -151,10 +196,23 @@ int main() {
                                 
                                 std::cout << "Enter new title: ";
                                 std::getline(std::cin, newTitle);
+                                sanitizeCSV(newTitle);
                                 std::cout << "Enter new genre: ";
                                 std::getline(std::cin, newGenre);
-                                std::cout << "Enter new year: ";
-                                std::cin >> newYear;
+                                sanitizeCSV(newGenre);
+                                
+                                // [INPUT VALIDATION] Re-prompts until a valid numerical year is entered
+                                while (true) {
+                                    std::cout << "Enter new year: ";
+                                    std::cin >> newYear;
+                                    if (std::cin.fail() || newYear < 1800 || newYear > 2100) {
+                                        std::cin.clear(); std::cin.ignore(10000, '\n');
+                                        std::cout << "=> Error: Invalid year! Please enter a valid number (1800-2100).\n";
+                                    } else {
+                                        std::cin.ignore(10000, '\n');
+                                        break;
+                                    }
+                                }
                                 
                                 catalog.editFilm(searchId, newTitle, newGenre, newYear);
                             }
@@ -167,7 +225,7 @@ int main() {
                                 std::cin >> searchId;
                                 if (searchId == "0") { std::cout << "=> Operation canceled.\n"; continue; }
                                 
-                                // [MEMORY] Deleting object safely from the vector of unique_ptrs
+                                // [MEMORY] Deletes object safely from the vector of unique_ptrs
                                 catalog.deleteFilm(searchId);
                             }
                             else if (subChoice == 6) { 
@@ -181,7 +239,6 @@ int main() {
                         // ==========================================
                         else if (loggedInUser->getRole() == "Customer") {
                             if (subChoice == 1) { 
-                                std::cin.ignore(); 
                                 // [ALGORITHM] Linear search & sorting algorithm execution
                                 catalog.advancedSearch(); 
                             }
@@ -190,13 +247,25 @@ int main() {
                                 catalog.displayWithFilter();
                                 
                                 std::string selectedFilmId;
-                                std::cout << "\nEnter Film ID you want to watch or '0' to cancel: ";
-                                std::cin >> selectedFilmId;
-                                if (selectedFilmId == "0") { std::cout << "=> Operation canceled.\n"; continue; }
+                                std::string filmTitle;
+                                
+                                // Locks flow until a valid existing Film ID is inputted
+                                while (true) {
+                                    std::cout << "\nEnter Film ID you want to watch or '0' to cancel: ";
+                                    std::cin >> selectedFilmId;
+                                    if (selectedFilmId == "0") break;
 
-                                std::string filmTitle = catalog.getFilmTitleById(selectedFilmId);
-                                if (filmTitle == "Unknown Film") {
-                                    std::cout << "=> Error: Film ID does not exist in the system!\n";
+                                    filmTitle = catalog.getFilmTitleById(selectedFilmId);
+                                    if (filmTitle == "Unknown Film") {
+                                        std::cout << "=> Error: Film ID does not exist in the system! Please try again.\n";
+                                    } else {
+                                        break;
+                                    }
+                                }
+
+                                if (selectedFilmId == "0") { 
+                                    std::cout << "=> Operation canceled.\n"; 
+                                    system("pause");
                                     continue; 
                                 }
 
@@ -221,7 +290,7 @@ int main() {
                                 }
                                 if (!validTime) continue; 
 
-                                // [FILE I/O & ALGORITHM] Load 2D Seat Map representation from bookings.csv
+                                // [FILE I/O & ALGORITHM] Load 2D Seat Map representation from persistent storage
                                 SeatMap map;
                                 BookingManager bookingMgr;
                                 std::cout << "\n=> Loading seat map for film [" << filmTitle << "] - Showtime [" << selectedTime << "]...\n";
@@ -229,41 +298,56 @@ int main() {
                                 bookingMgr.loadBookings(selectedFilmId, selectedTime, map);
                                 map.displayMap();
 
+                                int availableSeats = map.getAvailableSeats();
+
+                                // Nếu rạp đã kín chỗ, chặn ngay từ đầu không cho mua nữa
+                                if (availableSeats == 0) {
+                                    std::cout << "=> We're sorry, this showtime is fully booked (Sold out)!\n";
+                                    system("pause");
+                                    continue; // Quay trở lại menu
+                                }
+
                                 int numTickets = 0;
-                                // Correct number of ticket to pass
+                                // [INPUT VALIDATION] Ensures positive integer and checks against capacity
                                 while (true) {
-                                    std::cout << "\nEnter number of tickets to buy (or '0' to cancel): ";
+                                    // Cập nhật câu prompt để khách hàng biết rạp còn bao nhiêu chỗ
+                                    std::cout << "\nEnter number of tickets to buy (or '0' to cancel) - [" << availableSeats << " seats left]: ";
                                     std::cin >> numTickets;
                                     
                                     if (std::cin.fail() || numTickets < 0) {
                                         std::cin.clear(); 
                                         std::cin.ignore(10000, '\n'); 
-                                        std::cout << "=> Error: Number of tickets must be a valid integer!\n";
-                                    } else {
-                                        break;
+                                        std::cout << "=> Error: Number of tickets must be a valid positive integer!\n";
+                                    } 
+                                    // Chặn luồng nếu khách nhập số vé > số ghế trống
+                                    else if (numTickets > availableSeats) {
+                                        std::cout << "=> Error: Not enough seats available! The theater only has " << availableSeats << " seats left.\n";
+                                    } 
+                                    else {
+                                        break; // Số lượng hợp lệ, thoát vòng lặp để tiếp tục thanh toán
                                     }
                                 }
+
                                 if (numTickets == 0) {
                                     std::cout << "=> Ticket booking canceled.\n";
                                     continue; 
                                 }
 
-                                // [ALGORITHM] Dynamic Pricing Module
-                                // Base price calculated based on user demographic (Age)
+                                // [ALGORITHM] Dynamic Pricing Module: Base price depends on user demographics (Age)
                                 int userAge = loggedInUser->getAge();
                                 double basePrice = 0.0;
                                 if (userAge < 22) basePrice = 70000.0;
                                 else if (userAge >= 22 && userAge <= 70) basePrice = 120000.0;
                                 else basePrice = 50000.0;
 
-                                // [DATA STRUCTURES] STL Vectors acting as a temporary "Shopping Cart"
+                                // [DATA STRUCTURES] STL Vectors act as a temporary "Shopping Cart" for batch booking
                                 std::vector<char> cartRows;
                                 std::vector<int> cartCols;
                                 std::vector<double> cartPrices;
                                 std::vector<std::string> cartNames;
                                 double totalBatchPrice = 0.0;
 
-                                // Loop to collect the required number of seats
+                                // Iterates to collect the requested number of valid seats
                                 for (int i = 1; i <= numTickets; i++) {
                                     char row;
                                     int col;
@@ -280,14 +364,21 @@ int main() {
                                         std::cout << "[Ticket " << i << "/" << numTickets << "] Choose seat number (1-14): ";
                                         std::cin >> col;
 
-                                        // Validates seat and temporarily marks it as [X] in RAM (SeatMap Object)
+                                        if (std::cin.fail()) {
+                                            std::cin.clear(); // 1. Mở khóa lại cin sau khi sập
+                                            std::cin.ignore(10000, '\n'); // 2. Vứt bỏ toàn bộ chữ rác (như chữ 'f') đang kẹt trong buffer
+                                            std::cout << "=> Error: Invalid input format! Please enter a letter for row and a number for seat.\n";
+                                            continue; // 3. Bỏ qua các lệnh bên dưới, quay lại đầu vòng lặp cho nhập lại
+                                        }
+
+                                        // Validates seat boundaries and temporarily marks it as [X] in RAM
                                         if (map.bookSeat(row, col)) {
                                             seatValid = true;
                                             double surcharge = 0.0;
                                             std::string seatType = "";
                                             char upperRow = toupper(row);
 
-                                            // [ALGORITHM] Spatial Zoning Price Surcharge
+                                            // [ALGORITHM] Spatial Zoning: Surcharge mapping based on seat tier
                                             if (upperRow >= 'A' && upperRow <= 'D') {
                                                 seatType = "Regular"; surcharge = 0.0;
                                             } else if (upperRow >= 'E' && upperRow <= 'H') {
@@ -299,7 +390,7 @@ int main() {
                                             double ticketPrice = basePrice + surcharge;
                                             totalBatchPrice += ticketPrice;
 
-                                            // Add item properties to the vector cart
+                                            // Pushes valid selections into the vector cart
                                             cartRows.push_back(upperRow);
                                             cartCols.push_back(col);
                                             cartPrices.push_back(ticketPrice);
@@ -309,12 +400,12 @@ int main() {
                                         }
                                     }
                                     if (row == '0') {
-                                        cartRows.clear(); // Clear cart to avoid partial booking if canceled midway
+                                        cartRows.clear(); // Clears cart to prevent partial transactions if canceled midway
                                         break; 
                                     }
                                 }
 
-                                if (cartRows.empty()) continue; // Skip checkout if cart is empty
+                                if (cartRows.empty()) continue; 
 
                                 // --- CHECKOUT CONFIRMATION & LOYALTY SYSTEM ---
                                 int currentPoints = loggedInUser->getPoints();
@@ -332,12 +423,13 @@ int main() {
                                 std::cout << "--------------------------------\n";
                                 std::cout << "=> SUB-TOTAL : " << std::fixed << totalBatchPrice << " VND\n";
 
-                                // 10 points= 1000 VND
+                                // [LOYALTY SYSTEM] Point redemption threshold: 10 points = 1000 VND
                                 if (currentPoints >= 10) {
                                     int maxDiscountVND = (currentPoints / 10) * 1000;
                                     std::cout << "=> You currently have " << currentPoints << " Membership Points.\n";
                                     std::cout << "=> (Rate: 10 Points = 1000 VND Discount. Max usable: " << maxDiscountVND << " VND).\n";
                                     
+                                    // [INPUT VALIDATION] Ensures point redemption does not exceed available balance
                                     while (true) {
                                         std::cout << "=> Enter points to redeem (or '0' to skip): ";
                                         std::cin >> pointsToUse;
@@ -351,9 +443,8 @@ int main() {
                                             break;
                                         }
                                     }
-                                    // ------------------------------------------
 
-                                    // rounded point for easy caculation
+                                    // Floors points to multiples of 10 for structured calculation
                                     pointsToUse = (pointsToUse / 10) * 10;
                                     discount = (pointsToUse / 10) * 1000.0;
                                     if (discount > totalBatchPrice) discount = totalBatchPrice; 
@@ -368,29 +459,29 @@ int main() {
                                 std::cin >> confirm;
 
                                 if (toupper(confirm) == 'Y') { 
-                                    // [ALGORITHM] GENERATE RANDOM BOOKING CODE
+                                    // [ALGORITHM] Generates a 5-character alphanumeric booking reference code
                                     std::string bookingCode = "";
                                     const char charset[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
                                     for(int k = 0; k < 5; ++k) bookingCode += charset[rand() % 36];
 
-                                    // FIX: Chia đều số điểm đã dùng cho các vé trong giỏ hàng
+                                    // Equitably distributes redeemed points across all tickets in the batch
                                     int pointsUsedPerTicket = 0;
                                     if (cartRows.size() > 0) {
                                         pointsUsedPerTicket = pointsToUse / cartRows.size();
                                     }
 
+                                    // Flushes transaction array to persistent CSV storage
                                     for (size_t i = 0; i < cartRows.size(); i++) {
                                         double discountedTicketPrice = cartPrices[i] * (finalPrice / totalBatchPrice);
-                                        // Ghi thêm biến pointsUsedPerTicket vào hàm saveBooking
                                         bookingMgr.saveBooking(loggedInUser->getUserID(), selectedFilmId, selectedTime, cartRows[i], cartCols[i], discountedTicketPrice, bookingCode, pointsUsedPerTicket);
                                     }
 
-                                    // [ALGORITHM] UPDATE LOYALTY POINTS (Tiêu 1000đ = 1 điểm)
+                                    // [LOYALTY SYSTEM] Earns 1 point per 1000 VND spent in final transaction
                                     int earnedPoints = (int)(finalPrice / 1000.0);
                                     int newTotalPoints = currentPoints - pointsToUse + earnedPoints;
                                     
                                     loggedInUser->setPoints(newTotalPoints);
-                                    auth.updatePointsInFile(loggedInUser->getUserID(), newTotalPoints); // Lưu xuống file
+                                    auth.updatePointsInFile(loggedInUser->getUserID(), newTotalPoints); 
 
                                     std::cout << "\n============================================\n";
                                     std::cout << "=> CONGRATULATIONS! Transaction successful.\n";
@@ -398,13 +489,16 @@ int main() {
                                     std::cout << "=> You earned +" << earnedPoints << " points for this purchase!\n";
                                     std::cout << "============================================\n";
                                     map.displayMap(); 
+                                    system("pause");
                                 } else { 
                                     std::cout << "=> Transaction canceled. Returning to main menu...\n";
+                                    system("pause");
                                 }
                             }
                             else if (subChoice == 3) { 
                                 BookingManager bookingMgr;
                                 bookingMgr.displayBookingHistory(loggedInUser->getUserID(), catalog);
+                                system("pause");
                             }
                             else if (subChoice == 4) { 
                                 ReviewManager reviewMgr;
@@ -414,10 +508,11 @@ int main() {
                                 BookingManager bookingMgr;
                                 int netPointsChange = bookingMgr.cancelBooking(loggedInUser->getUserID(), catalog);
                                 
+                                // [LOYALTY SYSTEM] Recalculates point balance based on refund vs penalty algorithm
                                 if (netPointsChange != 0) {
                                     int currentPts = loggedInUser->getPoints();
-                                    int newPts = currentPts + netPointsChange; // Cộng gộp sự thay đổi
-                                    if (newPts < 0) newPts = 0; // Chống âm điểm
+                                    int newPts = currentPts + netPointsChange; 
+                                    if (newPts < 0) newPts = 0; // Prevents the point balance from dropping below zero
                                     
                                     loggedInUser->setPoints(newPts);
                                     auth.updatePointsInFile(loggedInUser->getUserID(), newPts);
@@ -428,6 +523,7 @@ int main() {
                                         std::cout << "=> Deducted " << -netPointsChange << " points. Your new point balance is: " << newPts << " Pts.\n";
                                     }
                                 }
+                                system("pause");
                             }
                             else if (subChoice == 6) { 
                                 std::cout << "\n--- MEMBERSHIP PROFILE ---\n";
@@ -443,16 +539,15 @@ int main() {
                 break; 
             }
             case 2:
-                // [FILE I/O] Registers user and appends to users.csv
+                system("cls");
+                // [FILE I/O] Registers user and appends credentials securely to users.csv
                 auth.registerUser();
                 break;
             case 0:
                 std::cout << "Saving data... Goodbye!\n";
-                // [FILE I/O] Flushes all modifications back to films.csv before program termination
+                // [FILE I/O] Flushes all state modifications back to films.csv before process termination
                 catalog.saveFilmsToFile(); 
                 break;
-            default:
-                std::cout << "Invalid choice. Please try again.\n";
         }
     }
     return 0;
