@@ -4,6 +4,7 @@
 #include <sstream>
 #include <string>
 #include <stdexcept>
+#include <algorithm>
 #include "SeatMap.hpp"
 #include "../film/FilmCatalog.hpp"
 
@@ -208,7 +209,7 @@ public:
                     linesToRemove.push_back(targetIndex);
                     
                     // Point Calculation Logic: (Points used to purchase tickets) - (Points added from the payment for those tickets)
-                    double pointsEarnedToDeduct = (userTicketPrices[choice - 1] / 1000.0);
+                    int pointsEarnedToDeduct = (int)(userTicketPrices[choice - 1] / 1000.0);
                     int pointsToRefund = userTicketPointsUsed[choice - 1];
                     netPointsChange += (pointsToRefund - pointsEarnedToDeduct);
                     
@@ -220,13 +221,12 @@ public:
         }
 
         if (!linesToRemove.empty()) {
-            for (size_t i = 0; i < linesToRemove.size() - 1; i++) {
-                for (size_t j = i + 1; j < linesToRemove.size(); j++) {
-                    if (linesToRemove[i] < linesToRemove[j]) {
-                        int temp = linesToRemove[i]; linesToRemove[i] = linesToRemove[j]; linesToRemove[j] = temp;
-                    }
-                }
+            std::sort(linesToRemove.begin(), linesToRemove.end(), std::greater<int>());
+
+            for (int idx : linesToRemove) { 
+                allLines.erase(allLines.begin() + idx); 
             }
+        
 
             for (int idx : linesToRemove) { allLines.erase(allLines.begin() + idx); }
 
