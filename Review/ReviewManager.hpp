@@ -9,6 +9,12 @@ class ReviewManager {
 private:
     // [FILE I/O] Relative path to the persistent storage file for reviews
     const std::string reviewFile = "data/reviews.csv";
+    
+    void sanitizeCSV(std::string& input) {
+        for (char& c : input) {
+            if (c == ',') c = ' ';
+        }
+    }
 
 public:
     // [OOP] Method passing FilmCatalog by reference to allow real-time state updates
@@ -57,6 +63,7 @@ public:
         std::cin.ignore(); // Flush the buffer before using getline
         std::cout << "Write your comment (without diacritics): ";
         std::getline(std::cin, comment);
+        sanitizeCSV(comment);
 
         // [ALGORITHM] Retrieve real-time system timestamp for the review
         std::time_t now = std::time(nullptr);
